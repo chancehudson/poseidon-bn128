@@ -1,5 +1,3 @@
-use std::fs::File;
-
 use anyhow::Result;
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -23,6 +21,32 @@ pub struct PoseidonParams {
     pub num_partial_rounds: usize,
 }
 
+// We'll store these constants in the binary itself
+// so accessing them at runtime is faster
+//
+// The downside is that constants for _all_ poseidons
+// are included even if only one is used. e.g. if you
+// only use poseidon2 you still have all the other
+// constants
+const POSEIDON_CONSTANTS: [&str; 16] = [
+    include_str!("params-json/1.json"),
+    include_str!("params-json/2.json"),
+    include_str!("params-json/3.json"),
+    include_str!("params-json/4.json"),
+    include_str!("params-json/5.json"),
+    include_str!("params-json/6.json"),
+    include_str!("params-json/7.json"),
+    include_str!("params-json/8.json"),
+    include_str!("params-json/9.json"),
+    include_str!("params-json/10.json"),
+    include_str!("params-json/11.json"),
+    include_str!("params-json/12.json"),
+    include_str!("params-json/13.json"),
+    include_str!("params-json/14.json"),
+    include_str!("params-json/15.json"),
+    include_str!("params-json/16.json")
+];
+
 fn pow5(v: Bn128FieldElement) -> Bn128FieldElement {
     let square = v * v;
     let quad = square * square;
@@ -42,13 +66,19 @@ fn mix(state: Vec<Bn128FieldElement>, params: &PoseidonParams) -> Vec<Bn128Field
     out
 }
 
+/// Calculate the poseidon hash on the alt_bn128 curve. Instantiated with
+/// the same parameters as the circomlib implementation of poseidon. The first
+/// argument is the number of inputs, the second argument is the inputs.
+/// This is so that accidentally sized input vectors are caught more easily.
+/// The input vector is an unsized slice for more simple compatiblity.
+/// This function errors if input_count != input.len()
 pub fn poseidon(input_count: u8, input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
     if input.len() != usize::from(input_count) {
         anyhow::bail!("expected {} inputs, received {}", input_count, input.len());
     }
     // constants are stored by number of inputs
     let params = read_constants(input_count)?;
-    let t = usize::try_from(input_count + 1)?;
+    let t = usize::from(input_count + 1);
 
     let mut state = [Bn128FieldElement::zero()]
         .iter()
@@ -72,10 +102,10 @@ pub fn poseidon(input_count: u8, input: &[Bn128FieldElement]) -> Result<Bn128Fie
     Ok(state[0])
 }
 
-/// Read the constants from file and parse into field elements
+/// Deserialize the constants from string (json) representation and return
+/// a structure with scalarff::FieldElement types
 pub fn read_constants(input_count: u8) -> Result<PoseidonParams> {
-    let f = File::open(format!("./src/params-json/{}.json", input_count))?;
-    let params: PoseidonParamsSerialized = serde_json::from_reader(f)?;
+    let params: PoseidonParamsSerialized = serde_json::from_str(POSEIDON_CONSTANTS[usize::from(input_count - 1)])?;
     let partial_round_counts = [
         56, 57, 56, 60, 60, 63, 64, 63, 60, 66, 60, 65, 70, 60, 64, 68,
     ];
