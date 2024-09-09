@@ -42,16 +42,13 @@ fn mix(state: Vec<Bn128FieldElement>, params: &PoseidonParams) -> Vec<Bn128Field
     out
 }
 
-/// Internal implementation of poseidon
-/// Invoke this function using the public functions below
-/// e.g. poseidon2(&[Bn128FieldElement::zero(), Bn128FieldElement::one()])
-fn poseidon(input: &[Bn128FieldElement], t: u8) -> Result<Bn128FieldElement> {
-    if input.len() != usize::from(t - 1) {
-        anyhow::bail!("expected {} inputs, received {}", t - 1, input.len());
+pub fn poseidon(input_count: u8, input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
+    if input.len() != usize::from(input_count) {
+        anyhow::bail!("expected {} inputs, received {}", input_count, input.len());
     }
     // constants are stored by number of inputs
-    let params = read_constants(t - 1)?;
-    let t = input.len() + 1;
+    let params = read_constants(input_count)?;
+    let t = usize::try_from(input_count + 1)?;
 
     let mut state = [Bn128FieldElement::zero()]
         .iter()
@@ -105,79 +102,30 @@ pub fn read_constants(input_count: u8) -> Result<PoseidonParams> {
     })
 }
 
-// ***************************************
-// public interface
-//
-// generated with
-/*
-for (let x = 1; x <= 16; x++) {
-  console.log(`pub fn poseidon${x}(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, ${x+1})
-  }`)
-}
-*/
-// ***************************************
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+    use std::time::Instant;
 
-pub fn poseidon1(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 2)
-}
+    use anyhow::Result;
+    use scalarff::Bn128FieldElement;
+    use scalarff::FieldElement;
 
-pub fn poseidon2(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 3)
-}
-
-pub fn poseidon3(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 4)
-}
-
-pub fn poseidon4(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 5)
-}
-
-pub fn poseidon5(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 6)
-}
-
-pub fn poseidon6(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 7)
-}
-
-pub fn poseidon7(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 8)
-}
-
-pub fn poseidon8(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 9)
-}
-
-pub fn poseidon9(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 10)
-}
-
-pub fn poseidon10(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 11)
-}
-
-pub fn poseidon11(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 12)
-}
-
-pub fn poseidon12(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 13)
-}
-
-pub fn poseidon13(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 14)
-}
-
-pub fn poseidon14(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 15)
-}
-
-pub fn poseidon15(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 16)
-}
-
-pub fn poseidon16(input: &[Bn128FieldElement]) -> Result<Bn128FieldElement> {
-    poseidon(input, 17)
+    #[test]
+    fn compare_hashes() -> Result<()>{
+        let f = File::open(format!("./src/test_hashes.json"))?;
+        let expected: Vec<Vec<String>> = serde_json::from_reader(f)?;
+        for i in 0..expected.len() {
+            let input_count = u8::try_from(i + 1)?;
+            let hash_count = expected[i].len();
+            let start = Instant::now();
+            for j in 0..hash_count {
+                let hash = super::poseidon(input_count, &vec![Bn128FieldElement::from(u64::try_from(j)?); usize::from(input_count)])?;
+                assert_eq!(hash.to_biguint().to_str_radix(16), expected[i][j][2..]);
+            }
+            let elapsed = start.elapsed();
+            println!("Calculated {hash_count} poseidon{input_count} hashes in: {:.2?}", elapsed);
+        }
+        Ok(())
+    }
 }
