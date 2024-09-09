@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 /// Representation for use with serde
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(non_snake_case)]
 pub struct PoseidonParamsSerialized {
     pub C: Vec<String>,
     pub M: Vec<Vec<String>>,
@@ -16,8 +17,8 @@ pub struct PoseidonParamsSerialized {
 
 /// Representation for use with the poseidon logic
 pub struct PoseidonParams {
-    pub C: Vec<Bn128FieldElement>,
-    pub M: Vec<Vec<Bn128FieldElement>>,
+    pub c: Vec<Bn128FieldElement>,
+    pub m: Vec<Vec<Bn128FieldElement>>,
     pub num_full_rounds: usize,
     pub num_partial_rounds: usize,
 }
@@ -32,8 +33,9 @@ fn mix(state: Vec<Bn128FieldElement>, params: &PoseidonParams) -> Vec<Bn128Field
     let mut out = vec![];
     for i in 0..state.len() {
         let mut o = Bn128FieldElement::zero();
+        #[allow(clippy::needless_range_loop)]
         for j in 0..state.len() {
-            o = o + params.M[i][j] * state[j];
+            o += params.m[i][j] * state[j];
         }
         out.push(o);
     }
@@ -44,7 +46,7 @@ fn mix(state: Vec<Bn128FieldElement>, params: &PoseidonParams) -> Vec<Bn128Field
 /// Invoke this function using the public functions below
 /// e.g. poseidon2(&[Bn128FieldElement::zero(), Bn128FieldElement::one()])
 fn poseidon(input: &[Bn128FieldElement], t: u8) -> Result<Bn128FieldElement> {
-    if input.len() != usize::try_from(t - 1)? {
+    if input.len() != usize::from(t - 1) {
         anyhow::bail!("expected {} inputs, received {}", t - 1, input.len());
     }
     // constants are stored by number of inputs
@@ -54,63 +56,53 @@ fn poseidon(input: &[Bn128FieldElement], t: u8) -> Result<Bn128FieldElement> {
     let mut state = [Bn128FieldElement::zero()]
         .iter()
         .chain(input)
-        .map(|v| v.clone())
+        .copied()
         .collect::<Vec<Bn128FieldElement>>();
 
     for x in 0..(params.num_full_rounds + params.num_partial_rounds) {
+        #[allow(clippy::needless_range_loop)]
         for y in 0..state.len() {
-            state[y] = state[y] + params.C[x * t + y];
-            if x < params.num_full_rounds / 2
+            state[y] += params.c[x * t + y];
+            if y == 0
+                || x < params.num_full_rounds / 2
                 || x >= params.num_full_rounds / 2 + params.num_partial_rounds
             {
-                state[y] = pow5(state[y]);
-            } else if y == 0 {
                 state[y] = pow5(state[y]);
             }
         }
         state = mix(state, &params);
     }
-    Ok(state[0].clone())
+    Ok(state[0])
 }
 
 /// Read the constants from file and parse into field elements
 pub fn read_constants(input_count: u8) -> Result<PoseidonParams> {
     let f = File::open(format!("./src/params-json/{}.json", input_count))?;
     let params: PoseidonParamsSerialized = serde_json::from_reader(f)?;
-    let partial_round_counts = vec![
+    let partial_round_counts = [
         56, 57, 56, 60, 60, 63, 64, 63, 60, 66, 60, 65, 70, 60, 64, 68,
     ];
-    let out_params = PoseidonParams {
+    // TODO: move this into scalarff?
+    let hex_str_to_field_element = |x: &String| {
+        Ok(Bn128FieldElement::from_biguint(&BigUint::from_str_radix(
+            &x[2..],
+            16,
+        )?))
+    };
+    Ok(PoseidonParams {
         num_full_rounds: 8,
-        num_partial_rounds: partial_round_counts[usize::try_from(input_count)? - 1],
-        C: params
+        num_partial_rounds: partial_round_counts[usize::from(input_count) - 1],
+        c: params
             .C
             .iter()
-            .map(|x| {
-                // TODO: clean this up :(
-                Ok(Bn128FieldElement::from_biguint(&BigUint::from_str_radix(
-                    &x[2..],
-                    16,
-                )?))
-            })
+            .map(hex_str_to_field_element)
             .collect::<Result<_>>()?,
-        M: params
+        m: params
             .M
             .iter()
-            .map(|internal| {
-                internal
-                    .iter()
-                    .map(|x| {
-                        Ok(Bn128FieldElement::from_biguint(&BigUint::from_str_radix(
-                            &x[2..],
-                            16,
-                        )?))
-                    })
-                    .collect::<Result<_>>()
-            })
+            .map(|internal| internal.iter().map(hex_str_to_field_element).collect())
             .collect::<Result<_>>()?,
-    };
-    Ok(out_params)
+    })
 }
 
 // ***************************************
