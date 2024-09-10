@@ -4,6 +4,7 @@ workflows:
     jobs:
       - lint
       - clippy
+      - examples
       - tests:
           matrix:
             parameters:
@@ -69,3 +70,16 @@ jobs:
       - run:
           name: Run r1cs test
           command: cargo test --release -- --nocapture
+  examples:
+    machine:
+      image: ubuntu-2204:current
+    environment: *rust_env
+    steps:
+      - checkout
+      - run: *rust_version
+      - run:
+          name: Run readme example
+          command: cargo run --example readme
+      - run:
+          name: Run hash example
+          command: cargo run --example hash
