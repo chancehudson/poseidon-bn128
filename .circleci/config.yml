@@ -76,7 +76,7 @@ jobs:
     environment: *rust_env
     steps:
       - checkout
-      - run: *rust_version
+      - run: *build_version_stable
       - run:
           name: Run readme example
           command: cargo run --example readme
