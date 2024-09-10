@@ -3,7 +3,8 @@ use num_bigint::BigUint;
 use num_traits::Num;
 use scalarff::Bn128FieldElement;
 use scalarff::FieldElement;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 /// Representation for use with serde
 #[derive(Debug, Serialize, Deserialize)]
