@@ -44,7 +44,7 @@ const POSEIDON_CONSTANTS: [&str; 16] = [
     include_str!("params-json/13.json"),
     include_str!("params-json/14.json"),
     include_str!("params-json/15.json"),
-    include_str!("params-json/16.json")
+    include_str!("params-json/16.json"),
 ];
 
 fn pow5(v: Bn128FieldElement) -> Bn128FieldElement {
@@ -105,7 +105,8 @@ pub fn poseidon(input_count: u8, input: &[Bn128FieldElement]) -> Result<Bn128Fie
 /// Deserialize the constants from string (json) representation and return
 /// a structure with scalarff::FieldElement types
 pub fn read_constants(input_count: u8) -> Result<PoseidonParams> {
-    let params: PoseidonParamsSerialized = serde_json::from_str(POSEIDON_CONSTANTS[usize::from(input_count - 1)])?;
+    let params: PoseidonParamsSerialized =
+        serde_json::from_str(POSEIDON_CONSTANTS[usize::from(input_count - 1)])?;
     let partial_round_counts = [
         56, 57, 56, 60, 60, 63, 64, 63, 60, 66, 60, 65, 70, 60, 64, 68,
     ];
@@ -142,7 +143,7 @@ mod tests {
     use scalarff::FieldElement;
 
     #[test]
-    fn compare_hashes() -> Result<()>{
+    fn compare_hashes() -> Result<()> {
         let f = File::open(format!("./src/test_hashes.json"))?;
         let expected: Vec<Vec<String>> = serde_json::from_reader(f)?;
         for i in 0..expected.len() {
@@ -150,11 +151,17 @@ mod tests {
             let hash_count = expected[i].len();
             let start = Instant::now();
             for j in 0..hash_count {
-                let hash = super::poseidon(input_count, &vec![Bn128FieldElement::from(u64::try_from(j)?); usize::from(input_count)])?;
+                let hash = super::poseidon(
+                    input_count,
+                    &vec![Bn128FieldElement::from(u64::try_from(j)?); usize::from(input_count)],
+                )?;
                 assert_eq!(hash.to_biguint().to_str_radix(16), expected[i][j][2..]);
             }
             let elapsed = start.elapsed();
-            println!("Calculated {hash_count} poseidon{input_count} hashes in: {:.2?}", elapsed);
+            println!(
+                "Calculated {hash_count} poseidon{input_count} hashes in: {:.2?}",
+                elapsed
+            );
         }
         Ok(())
     }

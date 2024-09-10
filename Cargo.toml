@@ -2,6 +2,11 @@
 name = "poseidon-bn128"
 version = "0.1.0"
 edition = "2021"
+authors = ["Chance Hudson <PSE>"]
+description = "Poseidon over alt_bn128 compatible with circomlib"
+homepage = "https://github.com/chancehudson/poseidon-bn128"
+repository = "https://github.com/chancehudson/poseidon-bn128.git"
+license = "MIT OR Apache-2.0"
 
 [lib]
 
